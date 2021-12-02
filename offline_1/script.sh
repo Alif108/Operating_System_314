@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-output_dir=~/Work/CSE_314/offline_1/Offline_SS/offline/
+output_dir_path=~/Work/CSE_314/offline_1/Offline_SS/offline/
 
 
 
@@ -21,8 +21,14 @@ collect_ignored_formats()
 # -- returns the file extension ; param -> filename
 get_file_extension()
 {
-	filename=$1
-	extension="${filename##*.}"
+	filename=`echo $1|xargs`
+	res="${filename//[^.]}"
+
+	if [ ${#res} -eq 0 ]; then
+		extension="others"
+	else
+		extension="${filename##*.}"
+	fi
 }
 
 
@@ -31,7 +37,6 @@ collect_selected_formats()
 {
 	cd "$1"															# go to the directory
 	level=$2														# directory level from given directory
-	ignored_file_count=0
 
 	for f in *
 	do
@@ -44,12 +49,12 @@ collect_selected_formats()
 					selected_formats+=($extension)												# appending to the selected_list
 				fi
 			else
-				ignored_file_count=$((ignored_file_count+1))									# if file is to be ignored, increase the count
+				ignored_file_count=$((ignored_file_count + 1))									# if file is to be ignored, increase the count
 			fi
 
 		elif [ -d "$f" ]; then										# if selected item is a directory
 			new_level=$((level+1))									# increase the level
-			collect_selected_formats $f $new_level					# call recursively
+			collect_selected_formats "$f" $new_level					# call recursively
 		fi
 	done
 
@@ -65,18 +70,18 @@ move_selected_files()
 
 	for f in *
 	do
-		if [ -f "$f" ]; then															# if selected item is a file
+		if [ -f "$f" ]; then																# if selected item is a file
 			
-			get_file_extension $f 														# getting the file extension
-			if [[ ! " ${formats_to_be_ignored[*]} " =~ " $extension " ]]; then	
-				mv $f ${output_dir}output_dir//$extension 								# move the file to the sub-directory
-				abs_path=$( realpath "$f" )												# getting the absolute path of the file					
-				echo $abs_path>>${output_dir}output_dir/$extension/desc.txt				# appending the file path to the desc file
+			get_file_extension $f 															# getting the file extension
+			if [[ ! " ${formats_to_be_ignored[*]} " =~ " $extension " ]]; then				# if this format is not to be ignored
+				cp $f ${output_dir_path}output_dir//$extension 								# move the file to the sub-directory
+				abs_path=$( realpath "$f" )													# getting the absolute path of the file					
+				echo $abs_path>>${output_dir_path}output_dir/$extension/desc.txt			# appending the file path to the desc file
 			fi
 
 		elif [ -d "$f" ]; then															# if selected item is a directory
 			new_level=$((level+1))														# increase the level
-			move_selected_files $f $new_level											# call recursively
+			move_selected_files "$f" $new_level											# call recursively
 		fi
 	done
 
@@ -87,14 +92,14 @@ move_selected_files()
 # -- make directories of a formats
 make_directories()
 {
-	mkdir "${output_dir}output_dir"											# create an output directory
-	touch ${output_dir}output_dir/output.csv								# create the csv file in output_directory
-	echo "Format, No_of_files">>${output_dir}output_dir/output.csv			# creating two columns in the csv file
+	mkdir "${output_dir}output_dir"												# create an output directory
+	touch ${output_dir}output_dir/output.csv									# create the csv file in output_directory
+	echo "Format, No_of_files">>${output_dir_path}output_dir/output.csv			# creating two columns in the csv file
 
-	for i in ${!selected_formats[@]}										# for each file in selected formats
+	for i in ${!selected_formats[@]}											# for each file in selected formats
 	do
-		mkdir -p ${output_dir}output_dir//${selected_formats[$i]}			# create sub-directories for different formats
-		touch ${output_dir}output_dir/${selected_formats[$i]}/desc.txt		# creating a description text file in the sub-directory
+		mkdir -p ${output_dir_path}output_dir//${selected_formats[$i]}			# create sub-directories for different formats
+		touch ${output_dir_path}output_dir/${selected_formats[$i]}/desc.txt		# creating a description text file in the sub-directory
 		# mkdir -p $dir${selected_formats[$i]}								
 	done
 }
@@ -105,10 +110,13 @@ populate_csv_file()
 {
 	for f in ${output_dir}output_dir/*
 	do
-		if [[ -d "$f" ]]; then
-			echo $f
+		if [[ -d "$f" ]]; then																	# for every directory in output_dir
+			format_name=${f##*/}																# taking the folder name aka format name 
+			count=$(ls $f|wc -l)																# taking the file count
+			echo $format_name, $((count-1))>>${output_dir_path}output_dir/output.csv			# entering value; count-1 because of the desc.txt file 
 		fi
 	done
+	echo "ignored", $ignored_file_count>>${output_dir_path}output_dir/output.csv
 }
 
 
@@ -123,6 +131,7 @@ if [ $# -eq 2 ]; then														# if 2 params are given i.e. directory and fi
 			echo "All inputs valid. Process starting..."
 
 			selected_formats=()												# declaring the array that will contain all the selected formats
+			ignored_file_count=0
 			collect_ignored_formats											
 			collect_selected_formats $dir 1
 			make_directories
@@ -146,13 +155,15 @@ elif [ $# -eq 1 ]; then														# if only 1 param is given -> i.e. fileName
 	if [ -d "$dir" ] && [ -f "$file" ]; then								# if directory and file is valid
 			echo "All inputs valid. Process starting..."
 
-			sselected_formats=()											# declaring the array that will contain all the selected formats
+			selected_formats=()												# declaring the array that will contain all the selected formats
 			collect_ignored_formats											
 			collect_selected_formats $dir 1
 			make_directories
 			move_selected_files $dir 1
+			populate_csv_file
 
 			echo Selected formats: ${selected_formats[*]}
+
 
 	else
 		echo "$file does not exist. Please provide a valid file."
@@ -161,8 +172,3 @@ elif [ $# -eq 1 ]; then														# if only 1 param is given -> i.e. fileName
 else
 	echo "Please Provide a Directory and an Input File"
 fi
-
-# for f in ./demo_files/*
-# do
-# 	echo $f
-# done
