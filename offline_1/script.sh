@@ -27,7 +27,7 @@ get_file_extension()
 	if [ ${#res} -eq 0 ]; then
 		extension="others"
 	else
-		extension="${filename##*.}"
+		extension="${filename##*.}"										# getting the rest after the last occurrence of .
 	fi
 }
 
@@ -52,13 +52,13 @@ collect_selected_formats()
 				ignored_file_count=$((ignored_file_count + 1))									# if file is to be ignored, increase the count
 			fi
 
-		elif [ -d "$f" ]; then										# if selected item is a directory
-			new_level=$((level+1))									# increase the level
+		elif [ -d "$f" ]; then											# if selected item is a directory
+			new_level=$((level+1))										# increase the level
 			collect_selected_formats "$f" $new_level					# call recursively
 		fi
 	done
 
-	cd ../															# come back
+	cd ../																# come back
 }
 
 
@@ -74,9 +74,15 @@ move_selected_files()
 			
 			get_file_extension $f 															# getting the file extension
 			if [[ ! " ${formats_to_be_ignored[*]} " =~ " $extension " ]]; then				# if this format is not to be ignored
-				cp $f ${output_dir_path}output_dir//$extension 								# move the file to the sub-directory
-				abs_path=$( realpath "$f" )													# getting the absolute path of the file					
-				echo $abs_path>>${output_dir_path}output_dir/$extension/desc.txt			# appending the file path to the desc file
+				cp "$f" "${output_dir_path}output_dir//$extension" 							# move the file to the sub-directory
+				abs_path=$( realpath "$f" )													# getting the absolute path of the file
+
+				x=${dir##*./}						
+				relative_path="${abs_path##*$x}"											# trimming everything before working_dir										
+				
+				# relative_path=$( realpath --relative-to=$dir "$f" )						# getting the relative path of the file
+
+				echo $relative_path>>${output_dir_path}output_dir/$extension/desc.txt		# appending the file path to the desc file
 			fi
 
 		elif [ -d "$f" ]; then															# if selected item is a directory
@@ -92,6 +98,7 @@ move_selected_files()
 # -- make directories of a formats
 make_directories()
 {
+	rm -r "${output_dir}output_dir"												# removing the directory if it already exists
 	mkdir "${output_dir}output_dir"												# create an output directory
 	touch ${output_dir}output_dir/output.csv									# create the csv file in output_directory
 	echo "Format, No_of_files">>${output_dir_path}output_dir/output.csv			# creating two columns in the csv file
@@ -116,7 +123,7 @@ populate_csv_file()
 			echo $format_name, $((count-1))>>${output_dir_path}output_dir/output.csv			# entering value; count-1 because of the desc.txt file 
 		fi
 	done
-	echo "ignored", $ignored_file_count>>${output_dir_path}output_dir/output.csv
+	echo "ignored", $ignored_file_count>>${output_dir_path}output_dir/output.csv 				# entering the ignored cases
 }
 
 
@@ -129,7 +136,6 @@ if [ $# -eq 2 ]; then														# if 2 params are given i.e. directory and fi
 		
 		if [ -f "$file" ]; then												# if file exists
 			echo "All inputs valid. Process starting..."
-
 			selected_formats=()												# declaring the array that will contain all the selected formats
 			ignored_file_count=0
 			collect_ignored_formats											
@@ -149,7 +155,7 @@ if [ $# -eq 2 ]; then														# if 2 params are given i.e. directory and fi
 	fi
 
 elif [ $# -eq 1 ]; then														# if only 1 param is given -> i.e. fileName
-	dir=~																	# then root is the working directory														
+	dir=/																	# then root is the working directory														
 	file=$1
 
 	if [ -d "$dir" ] && [ -f "$file" ]; then								# if directory and file is valid
