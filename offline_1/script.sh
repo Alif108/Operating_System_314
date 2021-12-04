@@ -2,7 +2,7 @@
 
 
 
-# -- reads the file formats to be ignored and stores them into an array
+# -- reads the file formats to be ignored from given text file and stores them into an array
 collect_ignored_formats()
 {
 	## -- reading from file and storing into array -- ##
@@ -18,11 +18,11 @@ collect_ignored_formats()
 # -- returns the file extension ; param -> filename
 get_file_extension()
 {
-	filename=`echo $1|xargs`
-	res="${filename//[^.]}"
+	filename=`echo $1|xargs`											# trimming all the whitespaces
+	res="${filename//[^.]}"												# getting the count of what's after dot
 
-	if [ ${#res} -eq 0 ]; then
-		extension="others"
+	if [ ${#res} -eq 0 ]; then											# if nothing is after dot i.e. no file extension given
+		extension="others"												# then extension is 'others'
 	else
 		extension="${filename##*.}"										# getting the rest after the last occurrence of .
 	fi
@@ -41,7 +41,7 @@ collect_selected_formats()
 			
 			get_file_extension $f 									# getting the file extension
 			
-			if [[ ! "$f" = "$file_actual_name" ]]; then	
+			if [[ ! "$f" = "$file_actual_name" ]]; then												# if file is not "input.txt"
 				if [[ ! " ${formats_to_be_ignored[*]} " =~ " $extension " ]]; then					# if file is not in format_to_ignored
 					if [[ ! " ${selected_formats[*]} " =~ " $extension " ]]; then					# if format is not already included
 						selected_formats+=($extension)												# appending to the selected_list
@@ -71,8 +71,9 @@ move_selected_files()
 	do
 		if [ -f "$f" ]; then																# if selected item is a file
 			
-			get_file_extension "$f" 														# getting the file extension
-			if [[ ! "$f" = "$file_actual_name" ]]; then	
+			get_file_extension "$f" 															# getting the file extension
+			
+			if [[ ! "$f" = "$file_actual_name" ]]; then											# if file is not "input.txt"
 				if [[ ! " ${formats_to_be_ignored[*]} " =~ " $extension " ]]; then				# if this format is not to be ignored
 
 					if [[ ! "$f" = "$file_actual_name" ]]; then												
@@ -142,7 +143,7 @@ if [ $# -eq 2 ]; then														# if 2 params are given i.e. directory and fi
 			
 			selected_formats=()												# declaring the array that will contain all the selected formats
 			ignored_file_count=0
-			output_dir_path=`realpath .`/
+			output_dir_path=`realpath .`/									# e.g. ~/Work/offline/
 
 			collect_ignored_formats											
 			collect_selected_formats $dir 1
@@ -173,7 +174,7 @@ elif [ $# -eq 1 ]; then														# if only 1 param is given -> i.e. fileName
 			
 			selected_formats=()												# declaring the array that will contain all the selected formats
 			ignored_file_count=0
-			output_dir_path=`realpath .`/												
+			output_dir_path=`realpath .`/									# ~/Work/offline/												
 			
 
 			collect_ignored_formats											
