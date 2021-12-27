@@ -19,6 +19,7 @@ sem_t sec_check_empty;
 sem_t belt_full;
 sem_t belt_empty;
 
+pthread_mutex_t boarding_mutex;
 
 class Passenger
 {
@@ -120,11 +121,29 @@ class Passenger
 
 		}
 
+		void * board()
+		{
+			int time;
+
+			pthread_mutex_lock(&boarding_mutex);
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d is approaching for boarding at time %d\n", id, time);
+
+			sleep(boarding_time);
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d has boarded on the plane at time %d\n", id, time);	
+
+			pthread_mutex_unlock(&boarding_mutex);
+		}
+
 
 		void * simulate()
 		{
 			check_in();
 			security_check();
+			board();
 		}
 
 };
@@ -187,10 +206,10 @@ int main()
 	int N = 2;
 	int P = 2;
 
-	int w = 2;
-	int x = 2;
-	int y = 2;
-	int z = 2;
+	int w = 3;
+	int x = 3;
+	int y = 3;
+	int z = 3;
 
 	sem_init(&check_in_full, 0, 0);
 	sem_init(&check_in_empty, 0, M);
@@ -221,7 +240,7 @@ int main()
 		Passenger* p = new Passenger(i+1, false, M, N, P, w, x, y, z);
 		pthread_t thread;
 		pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);
-		// sleep(i*2);
+		sleep(i);
 	}
 
 	pthread_exit(NULL);
