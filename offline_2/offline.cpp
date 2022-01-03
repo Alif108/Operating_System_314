@@ -19,12 +19,44 @@ sem_t sec_check_empty;
 sem_t belt_full;
 sem_t belt_empty;
 
+sem_t vip_channel_count;
+
+sem_t LR_count;
+sem_t RL_count;
+
 pthread_mutex_t boarding_mutex;
+
+pthread_mutex_t vip_LR_mutex;
+pthread_mutex_t vip_RL_mutex;
+
+// typedef struct vip_channel_priority
+// {
+// 	int LR_count = 0;
+// 	int RL_count = 0;
+// } vip_lock;
+
+
+// class vip_channel_priority
+// {
+// 	// int LR_count = 0;
+// 	// int RL_count = 0;
+
+// 	void vip_LR()
+// 	{
+// 		sem_post(LR_count);
+
+// 		// work
+
+// 		sem_wait(LR_count);
+// 	}
+// };
+
 
 class Passenger
 {
 	int id;
 	bool VIP;
+	bool boarding_pass_lost;
 
 	int kiosks;
 	int belts;
@@ -37,10 +69,11 @@ class Passenger
 	
 	public:
 
-		Passenger(int id, bool vip, int M, int N, int P, int c_time, int s_time, int b_time, int v_time)
+		Passenger(int id, bool vip, bool lost, int M, int N, int P, int c_time, int s_time, int b_time, int v_time)
 		{
 			this->id = id;
 			this->VIP = vip;
+			this->boarding_pass_lost = lost;
 
 			this->kiosks = M;
 			this->belts = N;
@@ -68,20 +101,26 @@ class Passenger
 			int count;
 			int time;
 
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d has arrived at the airport at time %d\n", id, time);
+
+			// -- critical region start -- //
 			sem_wait(&check_in_empty);
 			sem_post(&check_in_full);
 
 			sem_getvalue(&check_in_full, &count);
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %d has started waiting in kiosk %d at time %d\n", id, count, time);
+			printf("Passenger %d has started self-check in kiosk %d at time %d\n", id, count, time);
 
 			sleep(check_in_time);
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %d has got his boarding pass at time %d\n", id, time);
+			printf("Passenger %d has has finished check at time %d\n", id, time);
 
 			sem_wait(&check_in_full);
 			sem_post(&check_in_empty);
+
+			// -- critical region end -- //
 		}
 
 
@@ -90,12 +129,16 @@ class Passenger
 			int belt_count;
 			int time;
 
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d has started waiting for security check at time %d\n", id, time);
+
+			// -- critical region start -- //
 			sem_wait(&belt_empty);
 			sem_post(&belt_full);
 
 			sem_getvalue(&belt_full, &belt_count);
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %d has started waiting for security check in belt %d at time %d\n", id, ((belt_count-1)/passenger_per_belt)+1, time);
+			printf("Passenger %d has started security check in belt %d at time %d\n", id, ((belt_count-1)/passenger_per_belt)+1, time);
 
 			if(belt_count%passenger_per_belt == 0)
 			{
@@ -118,17 +161,63 @@ class Passenger
 				sem_wait(&sec_check_full);
 				sem_post(&sec_check_empty);
 			}
-
+			// -- critical region end -- //
 		}
+
+
+		void * VIP_channel_LR()
+		{
+			int time;
+			int temp;
+
+			sem_post(&vip_channel_count);
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d (VIP) has arrived at VIP channel at time %d\n", id, time);
+
+			sleep(vip_channel_time);
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d (VIP) has crossed the VIP channel at time %d\n", id, time);
+
+			sem_wait(&vip_channel_count);
+		}
+
+
+		void * VIP_channel_RL()
+		{
+			int time;
+			int count;
+
+			sem_getvalue(&vip_channel_count, &count);
+
+			while(count>0)
+			{
+				sem_getvalue(&vip_channel_count, &count);
+			}
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d is heading for the special kiosk through VIP channel at time %d\n", id, time);
+			
+			sleep(vip_channel_time);
+
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d has re-recieved his boarding pass at time %d\n", id, time);
+		}
+
 
 		void * board()
 		{
 			int time;
 
+			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+			printf("Passenger %d has started waiting to be boarded at time %d\n", id, time);
+
+			// -- critical region start -- //
 			pthread_mutex_lock(&boarding_mutex);
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %d is approaching for boarding at time %d\n", id, time);
+			printf("Passenger %d has started boarding the plane at time %d\n", id, time);
 
 			sleep(boarding_time);
 
@@ -136,13 +225,25 @@ class Passenger
 			printf("Passenger %d has boarded on the plane at time %d\n", id, time);	
 
 			pthread_mutex_unlock(&boarding_mutex);
+			// -- critical region end -- //
 		}
 
 
 		void * simulate()
 		{
 			check_in();
-			security_check();
+			
+			if(!VIP)
+				security_check();
+			else
+				VIP_channel_LR();
+
+			if(boarding_pass_lost)
+			{
+				printf("Passenger %d has lost his boarding pass\n", id);
+				VIP_channel_RL();
+			}
+			
 			board();
 		}
 
@@ -202,7 +303,7 @@ class Passenger
 int main()
 {
 
-	int M = 2;
+	int M = 3;
 	int N = 2;
 	int P = 2;
 
@@ -220,6 +321,9 @@ int main()
 	sem_init(&belt_full, 0, 0);
 	sem_init(&belt_empty, 0, N*P);
 
+	sem_init(&vip_channel_count, 0, 0);
+	pthread_mutex_init(&boarding_mutex, NULL);
+
 	// // Pointer to object of class Task
 	// Passenger* p1 = new Passenger(1, false, M, N, P, w, x, y, z);
 	// Passenger* p2 = new Passenger(2, false, M, N, P, w, x, y, z);
@@ -235,12 +339,27 @@ int main()
 	// pthread_create(&thread2, NULL, (THREADFUNCPTR) &Passenger::simulate, p2);
 	// pthread_create(&thread3, NULL, (THREADFUNCPTR) &Passenger::simulate, p3);
 
-	for(int i=0; i<5; i++)
+	for(int i=0; i<10; i++)
 	{
-		Passenger* p = new Passenger(i+1, false, M, N, P, w, x, y, z);
+		bool VIP = false;
+		bool lost = false;
+		
+		if(i%6 == 0)
+		{
+			VIP = true;
+			lost = true;
+		}
+
+		// Pointer to object of class Task
+		Passenger* p = new Passenger(i+1, VIP, lost, M, N, P, w, x, y, z);
+
+		//Thread ID
 		pthread_t thread;
+
+		// Create thread using memeber function as startup routine
 		pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);
-		sleep(i);
+
+		// sleep(i);
 	}
 
 	pthread_exit(NULL);
