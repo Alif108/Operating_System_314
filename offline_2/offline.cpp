@@ -1,19 +1,25 @@
-#include <iostream>
 #include<cstdio>
 #include<pthread.h>
 #include<semaphore.h>
 #include <unistd.h>
 #include <chrono>
+#include <random>
+#include <stdlib.h>
+#include <stack>
 #include "helper.h"
+
+#define ARRIVAL_RATE 5													// poisson arrival rate
+#define TOTAL_PASSENGERS 10												// total number of passengers that will be generated
 
 using namespace std;
 
-typedef void * (*THREADFUNCPTR)(void *);
-auto init_time = chrono::steady_clock::now();
 
-sem_t check_in_empty;
-sem_t sec_check_empty;
-sem_t belt_empty;
+typedef void * (*THREADFUNCPTR)(void *);
+auto init_time = chrono::steady_clock::now();							// taking the initial time
+
+sem_t check_in_empty;													// counting semaphore for check_in kiosks (M)
+sem_t sec_check_empty;													// counting semaphore for belts (N)
+sem_t belt_empty;														// counting semaphore for total belts (N*P)
 
 pthread_mutex_t boarding_mutex;
 pthread_mutex_t check_in_count_mutex;
@@ -31,6 +37,8 @@ int VIP_RL_count = 0;
 int VIP_LR_waiting = 0;
 
 
+
+// ------------ Passenger Class which will simulate the scenario ---------------- //
 class Passenger
 {
 	int id;
@@ -52,11 +60,11 @@ class Passenger
 	
 	public:
 
-		Passenger(int id, bool vip, bool lost, int M, int N, int P, int c_time, int s_time, int b_time, int v_time, bool* kiosks, bool* belts)
+		Passenger(int id, bool vip, int M, int N, int P, int c_time, int s_time, int b_time, int v_time, bool* kiosks, bool* belts)
 		{
 			this->id = id;
 			this->VIP = vip;
-			this->boarding_pass_lost = lost;
+			this->boarding_pass_lost = false;
 
 			this->nkiosks = M;
 			this->nbelts = N;
@@ -310,7 +318,7 @@ class Passenger
 			sleep(vip_channel_time);																			// executing the work
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %s has reached special_kiosk at time %d\n", name, time);
+			printf("Passenger %s has reached special kiosk at time %d\n", name, time);
 			fflush(stdout);
 
 
@@ -371,7 +379,10 @@ class Passenger
 				sleep(1);
 			}
 
-			if(boarding_pass_lost)
+			if(rand()%5 == 0)								// randomly losing boarding pass
+				boarding_pass_lost = true;
+
+			while(boarding_pass_lost)
 			{
 				printf("Passenger %s has lost his boarding pass\n", name);
 				fflush(stdout);
@@ -384,29 +395,52 @@ class Passenger
 
 				VIP_channel_LR();
 				sleep(1);
+
+				if(rand()%5 == 0)							// randomly losing boarding pass
+					boarding_pass_lost = true;
+				else
+					boarding_pass_lost = false;
 			}
-			
+
 			board();
 		}
-
 };
 
 
-int main()
-{
-	int M = 3;
-	int N = 2;
-	int P = 2;
+// -------- Driver ---------- //
 
-	int w = 2;
-	int x = 2;
-	int y = 2;
-	int z = 4;
+int main(int argc,char *argv[])
+{
+
+	if(argc!=2)
+	{
+		printf("Please provide input file name and try again\n");
+		return 0;
+	}
+
+	int* params = get_params(argv[1]);
+
+	if(*params == -1)
+	{
+		printf("Cannot open specified file\n");
+		return 0;
+	}
+
+	int M = params[0];
+	int N = params[1];
+	int P = params[2];
+
+	int w = params[3];
+	int x = params[4];
+	int y = params[5];
+	int z = params[6];
+
+
 
 	// initializing the semaphores
-	sem_init(&check_in_empty, 0, M);
-	sem_init(&sec_check_empty, 0, N);
-	sem_init(&belt_empty, 0, N*P);
+	sem_init(&check_in_empty, 0, M);									// initialized with number_of_kiosks
+	sem_init(&sec_check_empty, 0, N);									// initialized with number_of_belts
+	sem_init(&belt_empty, 0, N*P);										// initialized with (number_of_belts * passenger_per_belt)
 
 	// initializing the mutexes
 	pthread_mutex_init(&boarding_mutex, NULL);
@@ -437,29 +471,27 @@ int main()
 	}
 
 
-	// generating the passengers
-	for(int i=0; i<5; i++)
+	// ----------- generating the passengers in poisson distribution ------------- //
+
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	default_random_engine generator (seed);
+	srand(seed);
+
+	poisson_distribution<int> distribution (ARRIVAL_RATE);
+
+	for (int i=0; i<TOTAL_PASSENGERS; i++)
 	{
+		sleep(distribution(generator));
+
 		bool VIP = false;
-		bool lost = false;
 		
-		if(i%2 == 0)
-		{
-			lost = true;
-		}
-		if(i%3 == 0)
-		{
+		if(rand()%3 == 0)							// randomly assigning VIP
 			VIP = true;
-		}
 
-		Passenger* p = new Passenger(i+1, VIP, lost, M, N, P, w, x, y, z, kiosks, belts);
-
+		Passenger* p = new Passenger(i+1, VIP, M, N, P, w, x, y, z, kiosks, belts);
 		pthread_t thread;
 
-		// Create thread using memeber function as startup routine
-		pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);
-
-		sleep(int((5-i)/2));
+		pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);			// Creating thread using member function as startup routine
 	}
 
 	pthread_exit(NULL);

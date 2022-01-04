@@ -1,4 +1,5 @@
 #include <algorithm>
+#include<stdio.h>
 
 using namespace std;
 
@@ -62,15 +63,42 @@ char* int_to_char(int N)
 char* get_passenger_name(int id, bool VIP)
 {
     if(!VIP)
-        return int_to_char(id);
+        return int_to_char(id);                                 // e.g. "1"
     else
     {
         char* pass_id = int_to_char(id);
         char* designation = " (VIP)";
         char* name;
 
-        asprintf(&name, "%s%s", pass_id, designation);
+        asprintf(&name, "%s%s", pass_id, designation);          // concatenating
 
-        return name;
+        return name;                                            // e.g. "2 (VIP)"
     }
+}
+
+
+int* get_params(char* filepath)
+{
+    FILE *fin=fopen(filepath,"r");
+    
+    if(fin==NULL)
+    {
+        return new int(-1);
+    }
+
+    int* params = new int[7];
+    char buff[255];
+    int idx = 0;
+    int param;                                              
+    
+    while(fscanf(fin, "%s", buff)!=EOF)
+    {
+        sscanf(buff, "%d", &param);
+        params[idx] = param; 
+        idx++;
+    }
+
+    fclose(fin);
+
+    return params;
 }
