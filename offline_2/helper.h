@@ -1,6 +1,8 @@
 #include <algorithm>
 #include<stdio.h>
 
+#define n_params 7
+
 using namespace std;
 
 int get_idx(bool arr[], int n, bool elem)
@@ -27,23 +29,21 @@ char* int_to_char(int N)
     while (m)
     {
         digit++;                                // Increment number of digits
-
         m /= 10;                                // Truncate the last digit from the number     
     }
 
     char* arr;                                  // Declare char array for result
-
     char arr1[digit];                           // Declare duplicate char array
 
     arr = (char*)malloc(digit);                 // Memory allocation of array
 
     // Separating integer into digits and accommodate it to character array
     int index = 0;
+    
     while (N)
     {
 
         arr1[++index] = N % 10 + '0';           // Separate last digit from the number and add ASCII value of character '0' is 48
-
         N /= 10;                                // Truncate the last digit from the number
     }
 
@@ -86,15 +86,15 @@ int* get_params(char* filepath)
         return new int(-1);
     }
 
-    int* params = new int[7];
-    char buff[255];
+    int* params = new int[n_params];                            // 7 parameters will be provied in the file
+    char buff[255];                                             // buffer for reading the input characterwise
     int idx = 0;
     int param;                                              
     
     while(fscanf(fin, "%s", buff)!=EOF)
     {
-        sscanf(buff, "%d", &param);
-        params[idx] = param; 
+        sscanf(buff, "%d", &param);                             // from buffer to integer
+        params[idx] = param;                                    // putting it into array
         idx++;
     }
 

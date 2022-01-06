@@ -5,11 +5,12 @@
 #include <chrono>
 #include <random>
 #include <stdlib.h>
-#include <stack>
+#include <vector>
 #include "helper.h"
 
+#define TOTAL_TIME 10													// total time of simulation
 #define ARRIVAL_RATE 5													// poisson arrival rate
-#define TOTAL_PASSENGERS 10												// total number of passengers that will be generated
+// #define TOTAL_PASSENGERS 10												// total number of passengers that will be generated
 
 using namespace std;
 
@@ -35,6 +36,7 @@ int belts_count = 0;
 int VIP_LR_count = 0;
 int VIP_RL_count = 0;
 int VIP_LR_waiting = 0;
+int thread_end_count = 0;
 
 
 
@@ -65,6 +67,7 @@ class Passenger
 			this->id = id;
 			this->VIP = vip;
 			this->boarding_pass_lost = false;
+
 
 			this->nkiosks = M;
 			this->nbelts = N;
@@ -203,7 +206,7 @@ class Passenger
 			int time;
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %s has started waiting in special_kiosk at time %d\n", name, time);
+			printf("Passenger %s has started waiting in special kiosk at time %d\n", name, time);
 			fflush(stdout);
 
 			// ---------------------------- critical region start ---------------------- //
@@ -211,7 +214,7 @@ class Passenger
 			pthread_mutex_lock(&special_kiosk_mutex);															// lock the critical region (one thread at a time)
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
-			printf("Passenger %s has entered special_kiosk at time %d\n", name, time);
+			printf("Passenger %s has entered special kiosk at time %d\n", name, time);
 			fflush(stdout);
 
 			sleep(boarding_time);																				// executing the work
@@ -379,7 +382,7 @@ class Passenger
 				sleep(1);
 			}
 
-			if(rand()%5 == 0)								// randomly losing boarding pass
+			if(rand()%(rand()%10 + 1) == 0)					// randomly losing boarding pass
 				boarding_pass_lost = true;
 
 			while(boarding_pass_lost)
@@ -396,13 +399,21 @@ class Passenger
 				VIP_channel_LR();
 				sleep(1);
 
-				if(rand()%5 == 0)							// randomly losing boarding pass
+				if(rand()%(rand()%10 + 1) == 0)				// randomly losing boarding pass
 					boarding_pass_lost = true;
 				else
 					boarding_pass_lost = false;
 			}
 
 			board();
+
+			pthread_exit(NULL);
+		}
+
+		~Passenger()
+		{
+			printf("Passenger %d has been deleted\n", id);
+			fflush(stdout);
 		}
 };
 
@@ -452,7 +463,6 @@ int main(int argc,char *argv[])
 	pthread_mutex_init(&VIP_priority_mutex, NULL);
 	pthread_mutex_init(&special_kiosk_mutex, NULL);
 
-
 	bool* kiosks;
 	kiosks = new bool[M];
 
@@ -477,22 +487,56 @@ int main(int argc,char *argv[])
 	default_random_engine generator (seed);
 	srand(seed);
 
+	int time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+	int id = 1;
+	bool VIP;
+	int n_passengers;
+	int thread_creation_flag;
 	poisson_distribution<int> distribution (ARRIVAL_RATE);
+	// vector<Passenger*> passenger_vector;
+	vector<pthread_t*> thread_vector;
 
-	for (int i=0; i<TOTAL_PASSENGERS; i++)
+	while(time < TOTAL_TIME)
 	{
-		sleep(distribution(generator));
-
-		bool VIP = false;
-		
-		if(rand()%3 == 0)							// randomly assigning VIP
+		VIP = false;
+	
+		if(rand()%(rand()%10 + 1) == 0)							// randomly assigning VIP
 			VIP = true;
 
-		Passenger* p = new Passenger(i+1, VIP, M, N, P, w, x, y, z, kiosks, belts);
+		Passenger* p = new Passenger(id, VIP, M, N, P, w, x, y, z, kiosks, belts);
 		pthread_t thread;
 
-		pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);			// Creating thread using member function as startup routine
+		// passenger_vector.push_back(p);
+		thread_vector.push_back(&thread);
+
+		// Creating thread using member function as startup routine
+		thread_creation_flag = pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);		
+		if(thread_creation_flag != 0)
+		{
+			printf("Passenger %d thread could not be created\n", id);
+			fflush(stdout);
+		}
+
+		time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
+		id++;
+
+		sleep(distribution(generator));
 	}
+
+
+	for (int i=0; i<thread_vector.size(); i++)
+	{
+		pthread_detach(*thread_vector[i]);
+	}
+	// 	int x = pthread_join(*thread_vector[i], NULL);
+	// 	if(x)
+	// 		printf("Joining failed %d\n", x);
+	// }
+
+	// for(int i=0; i<passenger_vector.size(); i++)
+	// {
+	// 	delete passenger_vector[i];
+	// }
 
 	pthread_exit(NULL);
 
