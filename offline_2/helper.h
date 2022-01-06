@@ -5,6 +5,9 @@
 
 using namespace std;
 
+
+// function that returns the index of the first occurence of element(elem)
+// if no occurence, return -1
 int get_idx(bool arr[], int n, bool elem)
 {
 	auto itr = find(arr, arr + n, elem);
@@ -20,6 +23,7 @@ int get_idx(bool arr[], int n, bool elem)
 }
 
 
+// function to convert integer to character_array(string)
 char* int_to_char(int N)
 {
     // Count digits in number N
@@ -60,6 +64,8 @@ char* int_to_char(int N)
 }
 
 
+// function that appends " (VIP)" with id, 
+// if passenger if VIP
 char* get_passenger_name(int id, bool VIP)
 {
     if(!VIP)
@@ -77,6 +83,9 @@ char* get_passenger_name(int id, bool VIP)
 }
 
 
+// function that reads all the parameters
+// from input file and returns
+// in an array form
 int* get_params(char* filepath)
 {
     FILE *fin=fopen(filepath,"r");

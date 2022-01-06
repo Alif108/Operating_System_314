@@ -8,7 +8,7 @@
 #include <vector>
 #include "helper.h"
 
-#define TOTAL_TIME 10													// total time of simulation
+#define TOTAL_TIME 20													// total time of simulation
 #define ARRIVAL_RATE 5													// poisson arrival rate
 // #define TOTAL_PASSENGERS 10												// total number of passengers that will be generated
 
@@ -36,7 +36,8 @@ int belts_count = 0;
 int VIP_LR_count = 0;
 int VIP_RL_count = 0;
 int VIP_LR_waiting = 0;
-int thread_end_count = 0;
+
+FILE *output_file;
 
 
 
@@ -68,7 +69,6 @@ class Passenger
 			this->VIP = vip;
 			this->boarding_pass_lost = false;
 
-
 			this->nkiosks = M;
 			this->nbelts = N;
 			this->passenger_per_belt = P;
@@ -81,7 +81,7 @@ class Passenger
 			this->kiosks = kiosks;
 			this->belts = belts;
 
-			this->name = get_passenger_name(id, VIP);
+			this->name = get_passenger_name(id, VIP);					// get_passenger_name() is defined in "helper.h"
 		}
 
 		void * check_in()
@@ -92,11 +92,13 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has arrived at the airport at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has arrived at the airport at time %d\n", name, time);
+			fflush(output_file);
 
 			// ---------------------------- critical region start ---------------------- //
 
 			sem_wait(&check_in_empty);																					// down(empty) by 1
-			
+
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 
 
@@ -110,6 +112,8 @@ class Passenger
 			
 			printf("Passenger %s has started self-check in kiosk %d at time %d\n", name, assigned_kiosk+1, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started self-check in kiosk %d at time %d\n", name, assigned_kiosk+1, time);
+			fflush(output_file);
 			
 			pthread_mutex_unlock(&check_in_count_mutex);																// unlocking the block
 			// block ended //
@@ -129,6 +133,8 @@ class Passenger
 			
 			printf("Passenger %s has finished self-check in kiosk %d at time %d\n", name, assigned_kiosk+1, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has finished self-check in kiosk %d at time %d\n", name, assigned_kiosk+1, time);
+			fflush(output_file);
 			
 			pthread_mutex_unlock(&check_in_count_mutex);																// unlocking the block
 			// block ended //
@@ -148,6 +154,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has started waiting for security check at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started waiting for security check at time %d\n", name, time);
+			fflush(output_file);
 
 			// ---------------------------- critical region start ---------------------- //
 			
@@ -165,6 +173,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();		
 			printf("Passenger %s has started security check in belt %d at time %d\n", name, (assigned_belt/passenger_per_belt)+1, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started security check in belt %d at time %d\n", name, (assigned_belt/passenger_per_belt)+1, time);
+			fflush(output_file);
 
 			if(belts_count%passenger_per_belt == 0)																	// if occupied belt_count has crossed passenger_per_belt
 			{
@@ -181,6 +191,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has crossed the security check at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has crossed the security check at time %d\n", name, time);
+			fflush(output_file);
 
 
 			// code inside this block has to be executed by only one thread at a time, so mutex is used //
@@ -208,6 +220,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has started waiting in special kiosk at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started waiting in special kiosk at time %d\n", name, time);
+			fflush(output_file);
 
 			// ---------------------------- critical region start ---------------------- //
 			
@@ -216,12 +230,16 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has entered special kiosk at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has entered special kiosk at time %d\n", name, time);
+			fflush(output_file);
 
-			sleep(boarding_time);																				// executing the work
+			sleep(check_in_time);																				// executing the work
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has re-received boarding pass at time %d\n", name, time);	
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has re-received boarding pass at time %d\n", name, time);
+			fflush(output_file);
 
 			pthread_mutex_unlock(&special_kiosk_mutex);															// unlock the critical region
 			
@@ -247,6 +265,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has arrived at VIP channel at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has arrived at VIP channel at time %d\n", name, time);
+			fflush(output_file);
 
 
 
@@ -269,12 +289,16 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has started to cross VIP channel at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started to cross VIP channel at time %d\n", name, time);
+			fflush(output_file);
 
 			sleep(vip_channel_time);																				// executing the work
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has crossed the VIP channel at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has crossed the VIP channel at time %d\n", name, time);
+			fflush(output_file);
 
 
 
@@ -297,6 +321,8 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s is waiting at VIP channel for the special kiosk at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s is waiting at VIP channel for the special kiosk at time %d\n", name, time);
+			fflush(output_file);
 
 
 			pthread_mutex_lock(&VIP_priority_mutex);				// if anyone is waiting at the LR_channel, lock the RL_channel (prioirity)
@@ -317,12 +343,16 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s is heading for the special kiosk through VIP channel at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s is heading for the special kiosk through VIP channel at time %d\n", name, time);
+			fflush(output_file);
 			
 			sleep(vip_channel_time);																			// executing the work
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has reached special kiosk at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has reached special kiosk at time %d\n", name, time);
+			fflush(output_file);
 
 
 
@@ -345,22 +375,29 @@ class Passenger
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has started waiting to be boarded at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started waiting to be boarded at time %d\n", name, time);
+			fflush(output_file);
 
 			// ---------------------------- critical region start ---------------------- //
 			
-			pthread_mutex_lock(&boarding_mutex);																// lock the critical region (one thread at a time)
+			pthread_mutex_lock(&boarding_mutex);													// lock the critical region (one thread at a time)
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has started boarding the plane at time %d\n", name, time);
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has started boarding the plane at time %d\n", name, time);
+			fflush(output_file);
 
-			sleep(boarding_time);																				// executing the work
+			sleep(boarding_time);																	// executing the work
 
 			time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 			printf("Passenger %s has boarded on the plane at time %d\n", name, time);	
 			fflush(stdout);
+			fprintf(output_file, "Passenger %s has boarded on the plane at time %d\n", name, time);
+			fflush(output_file);
 
-			pthread_mutex_unlock(&boarding_mutex);																// unlock the critical region
+
+			pthread_mutex_unlock(&boarding_mutex);													// unlock the critical region
 			
 			// ---------------------------- critical region end ---------------------- //
 		}
@@ -389,6 +426,9 @@ class Passenger
 			{
 				printf("Passenger %s has lost his boarding pass\n", name);
 				fflush(stdout);
+				fprintf(output_file, "Passenger %s has lost his boarding pass\n", name);
+				fflush(output_file);
+
 
 				VIP_channel_RL();
 				sleep(1);
@@ -429,7 +469,7 @@ int main(int argc,char *argv[])
 		return 0;
 	}
 
-	int* params = get_params(argv[1]);
+	int* params = get_params(argv[1]);								// get_params() defined in "helper.h"
 
 	if(*params == -1)
 	{
@@ -437,32 +477,111 @@ int main(int argc,char *argv[])
 		return 0;
 	}
 
-	int M = params[0];
-	int N = params[1];
-	int P = params[2];
+	// setting the parameters
+	int M = params[0];				// kiosk number
+	int N = params[1];				// belt number
+	int P = params[2];				// passenger per belt
 
-	int w = params[3];
-	int x = params[4];
-	int y = params[5];
-	int z = params[6];
+	int w = params[3];				// time for self check-in at a kiosk
+	int x = params[4];				// time for security check
+	int y = params[5];				// time for boarding at the gate
+	int z = params[6];				// time for walking on VIP channel in either direction
 
+
+	// initializing output file
+	output_file = fopen("output.txt","a");
+	if(output_file == NULL)
+	{
+		printf("Cannot create output file\n");   
+		return 0;
+	}
 
 
 	// initializing the semaphores
-	sem_init(&check_in_empty, 0, M);									// initialized with number_of_kiosks
-	sem_init(&sec_check_empty, 0, N);									// initialized with number_of_belts
-	sem_init(&belt_empty, 0, N*P);										// initialized with (number_of_belts * passenger_per_belt)
+	int return_value;
+	
+	return_value = sem_init(&check_in_empty, 0, M);					// initialized with number_of_kiosks
+	if(return_value != 0)
+	{
+		printf("check_in_empty semaphore initializaion failed\n");
+		return 0;
+	}
+
+	return_value = sem_init(&sec_check_empty, 0, N);				// initialized with number_of_belts
+	if(return_value != 0)
+	{
+		printf("sec_check_empty semaphore initializaion failed\n");
+		return 0;
+	}
+
+	return_value = sem_init(&belt_empty, 0, N*P);					// initialized with (number_of_belts * passenger_per_belt)
+	if(return_value != 0)
+	{
+		printf("belt_empty semaphore initializaion failed\n");
+		return 0;
+	}
+
+
 
 	// initializing the mutexes
-	pthread_mutex_init(&boarding_mutex, NULL);
-	pthread_mutex_init(&check_in_count_mutex, NULL);
-	pthread_mutex_init(&belts_count_mutex, NULL);
-	pthread_mutex_init(&VIP_LR_mutex, NULL);
-	pthread_mutex_init(&VIP_RL_mutex, NULL);
-	pthread_mutex_init(&VIP_waiting_mutex, NULL);
-	pthread_mutex_init(&VIP_priority_mutex, NULL);
-	pthread_mutex_init(&special_kiosk_mutex, NULL);
+	return_value = pthread_mutex_init(&boarding_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("boarding_mutex initializaion failed\n");
+		return 0;
+	}
 
+	return_value = pthread_mutex_init(&check_in_count_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("check_in_count_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&belts_count_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("belts_count_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&VIP_LR_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("VIP_LR_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&VIP_RL_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("VIP_RL_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&VIP_waiting_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("VIP_waiting_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&VIP_priority_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("VIP_priority_mutex initializaion failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_init(&special_kiosk_mutex, NULL);
+	if(return_value != 0)
+	{
+		printf("special_kiosk_mutex initializaion failed\n");
+		return 0;
+	}
+
+
+	// initializing resources: kiosks and belts
 	bool* kiosks;
 	kiosks = new bool[M];
 
@@ -471,7 +590,6 @@ int main(int argc,char *argv[])
 		kiosks[i] = false;
 	}
 
-
 	bool* belts;
 	belts = new bool[N*P];
 
@@ -479,6 +597,7 @@ int main(int argc,char *argv[])
 	{
 		belts[i] = false;
 	}
+
 
 
 	// ----------- generating the passengers in poisson distribution ------------- //
@@ -490,8 +609,6 @@ int main(int argc,char *argv[])
 	int time = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - init_time).count();
 	int id = 1;
 	bool VIP;
-	int n_passengers;
-	int thread_creation_flag;
 	poisson_distribution<int> distribution (ARRIVAL_RATE);
 	// vector<Passenger*> passenger_vector;
 	vector<pthread_t*> thread_vector;
@@ -510,8 +627,8 @@ int main(int argc,char *argv[])
 		thread_vector.push_back(&thread);
 
 		// Creating thread using member function as startup routine
-		thread_creation_flag = pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);		
-		if(thread_creation_flag != 0)
+		return_value = pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);		
+		if(return_value != 0)
 		{
 			printf("Passenger %d thread could not be created\n", id);
 			fflush(stdout);
@@ -528,6 +645,7 @@ int main(int argc,char *argv[])
 	{
 		pthread_detach(*thread_vector[i]);
 	}
+	// {
 	// 	int x = pthread_join(*thread_vector[i], NULL);
 	// 	if(x)
 	// 		printf("Joining failed %d\n", x);
@@ -538,6 +656,7 @@ int main(int argc,char *argv[])
 	// 	delete passenger_vector[i];
 	// }
 
+	// fclose(output_file);
 	pthread_exit(NULL);
 
 	return 0;
