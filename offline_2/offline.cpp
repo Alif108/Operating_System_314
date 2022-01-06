@@ -4,13 +4,11 @@
 #include <unistd.h>
 #include <chrono>
 #include <random>
-#include <stdlib.h>
 #include <vector>
 #include "helper.h"
 
-#define TOTAL_TIME 20													// total time of simulation
+#define TOTAL_TIME 40													// total time of generating passengers
 #define ARRIVAL_RATE 5													// poisson arrival rate
-// #define TOTAL_PASSENGERS 10												// total number of passengers that will be generated
 
 using namespace std;
 
@@ -477,7 +475,9 @@ int main(int argc,char *argv[])
 		return 0;
 	}
 
-	// setting the parameters
+
+	// -------------------- setting the parameters ------------------------ //
+
 	int M = params[0];				// kiosk number
 	int N = params[1];				// belt number
 	int P = params[2];				// passenger per belt
@@ -488,7 +488,9 @@ int main(int argc,char *argv[])
 	int z = params[6];				// time for walking on VIP channel in either direction
 
 
-	// initializing output file
+	
+	// ------------------- initializing output file ---------------------- //
+
 	output_file = fopen("output.txt","a");
 	if(output_file == NULL)
 	{
@@ -497,7 +499,8 @@ int main(int argc,char *argv[])
 	}
 
 
-	// initializing the semaphores
+	// ------------------- initializing the semaphores --------------------- //
+
 	int return_value;
 	
 	return_value = sem_init(&check_in_empty, 0, M);					// initialized with number_of_kiosks
@@ -522,8 +525,8 @@ int main(int argc,char *argv[])
 	}
 
 
+	// ------------------ initializing the mutexes --------------------- //
 
-	// initializing the mutexes
 	return_value = pthread_mutex_init(&boarding_mutex, NULL);
 	if(return_value != 0)
 	{
@@ -581,7 +584,8 @@ int main(int argc,char *argv[])
 	}
 
 
-	// initializing resources: kiosks and belts
+	// ---------- initializing other resources: kiosks and belts ---------------- //
+
 	bool* kiosks;
 	kiosks = new bool[M];
 
@@ -610,8 +614,8 @@ int main(int argc,char *argv[])
 	int id = 1;
 	bool VIP;
 	poisson_distribution<int> distribution (ARRIVAL_RATE);
-	// vector<Passenger*> passenger_vector;
-	vector<pthread_t*> thread_vector;
+	vector<Passenger*> passenger_vector;
+	vector<pthread_t> thread_vector;
 
 	while(time < TOTAL_TIME)
 	{
@@ -623,11 +627,11 @@ int main(int argc,char *argv[])
 		Passenger* p = new Passenger(id, VIP, M, N, P, w, x, y, z, kiosks, belts);
 		pthread_t thread;
 
-		// passenger_vector.push_back(p);
-		thread_vector.push_back(&thread);
+		passenger_vector.push_back(p);
+		thread_vector.push_back(thread);
 
 		// Creating thread using member function as startup routine
-		return_value = pthread_create(&thread, NULL, (THREADFUNCPTR) &Passenger::simulate, p);		
+		return_value = pthread_create(&thread_vector.back(), NULL, (THREADFUNCPTR) &Passenger::simulate, p);		
 		if(return_value != 0)
 		{
 			printf("Passenger %d thread could not be created\n", id);
@@ -641,22 +645,116 @@ int main(int argc,char *argv[])
 	}
 
 
+	// --------------------- waiting until all the threads end --------------- //
+
 	for (int i=0; i<thread_vector.size(); i++)
 	{
-		pthread_detach(*thread_vector[i]);
+		if(pthread_join(thread_vector[i], NULL))
+			printf("Joining failed %d\n", x);
 	}
-	// {
-	// 	int x = pthread_join(*thread_vector[i], NULL);
-	// 	if(x)
-	// 		printf("Joining failed %d\n", x);
-	// }
 
-	// for(int i=0; i<passenger_vector.size(); i++)
-	// {
-	// 	delete passenger_vector[i];
-	// }
+	
 
-	// fclose(output_file);
+	// --------------------- deallocating all the passengers ---------------- //
+
+	printf("\n");
+	for(int i=0; i<passenger_vector.size(); i++)
+	{
+		delete passenger_vector[i];
+	}
+
+
+	// ---------------- destroying the semaphores ----------------------//
+
+	return_value = sem_destroy(&check_in_empty);
+	if(return_value != 0)
+	{
+		printf("check_in_empty semaphore destroy failed\n");
+		return 0;
+	}
+
+	return_value = sem_destroy(&sec_check_empty);
+	if(return_value != 0)
+	{
+		printf("sec_check_empty semaphore destroy failed\n");
+		return 0;
+	}
+
+	return_value = sem_destroy(&belt_empty);
+	if(return_value != 0)
+	{
+		printf("belt_empty semaphore destroy failed\n");
+		return 0;
+	}
+
+
+	// ------------------ destroying the mutexes ------------------------- //
+
+	return_value = pthread_mutex_destroy(&boarding_mutex);
+	if(return_value != 0)
+	{
+		printf("boarding_mutex destroy failed\n");
+		return 0;
+	}
+
+	return_value = pthread_mutex_destroy(&check_in_count_mutex);
+	if(return_value != 0)
+	{
+		printf("check_in_count_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&belts_count_mutex);
+	if(return_value != 0)
+	{
+		printf("belts_count_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&VIP_LR_mutex);
+	if(return_value != 0)
+	{
+		printf("VIP_LR_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&VIP_RL_mutex);
+	if(return_value != 0)
+	{
+		printf("VIP_RL_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&VIP_waiting_mutex);
+	if(return_value != 0)
+	{
+		printf("VIP_waiting_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&VIP_priority_mutex);
+	if(return_value != 0)
+	{
+		printf("VIP_priority_mutex destroy failed\n");
+		return 0;
+	}
+	
+	return_value = pthread_mutex_destroy(&special_kiosk_mutex);
+	if(return_value != 0)
+	{
+		printf("special_kiosk_mutex destroy failed\n");
+		return 0;
+	}
+
+
+	// ---------------- deallocating other resources ------------------- //
+
+	delete[] kiosks;
+	delete[] belts;
+
+	// ---------------- closing file stream ---------------- //
+	fclose(output_file);
+
 	pthread_exit(NULL);
 
 	return 0;
