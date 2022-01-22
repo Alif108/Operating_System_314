@@ -5,3 +5,9 @@ Offline on Shell Script
 
 ## Offline_2
 Offline on Inter Process Communication (IPC) using posix_thread
+
+## Online_2
+Adding user functions and system call in xv6
+
+## Offline_3
+Implementing the "lotter scheduler" in xv6
