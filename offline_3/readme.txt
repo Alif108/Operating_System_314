@@ -15,16 +15,16 @@ How to Run
 In this assignment
 ----------------------------
 
-* ps 
+$ ps 
 	- shows the current process statistics (pid, ticks, tickets)
 
-* createp [tickets(optional)]
+$ createp [tickets(optional)]
 	- creates a new process with given tickets. (Tickets are priority, a higher number of tickets indicate higher priority)
 	- if no arg is given, default ticket = 1
 	
-* settickets [pid, tickets]
+$ settickets [pid, tickets]
 	- sets tickets of the process of the given pid
 	
-* simlot [time]
+$ simlot [time]
 	- simulates lottery scheduling in the given time
 	- outputs a statistics about cpu usage of the processes in the given time

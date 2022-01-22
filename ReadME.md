@@ -10,4 +10,4 @@ Offline on Inter Process Communication (IPC) using posix_thread
 Adding user functions and system call in xv6
 
 ## Offline_3
-Implementing the "lotter scheduler" in xv6
+Implementing the "lottery scheduler" in xv6
