@@ -11,3 +11,6 @@ Adding user functions and system call in xv6
 
 ## Offline_3
 Implementing the "lottery scheduler" in xv6
+
+## Offline_4
+Implementing "Paging Memory Management" in xv6 (partial)
