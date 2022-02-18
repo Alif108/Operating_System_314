@@ -81,7 +81,7 @@ index a82d8e2..f526cc8 100644
  #endif
 +#endif
 diff --git a/proc.c b/proc.c
-index 806b1b1..fb6a458 100644
+index 806b1b1..424aa38 100644
 --- a/proc.c
 +++ b/proc.c
 @@ -5,12 +5,13 @@
@@ -99,7 +99,7 @@ index 806b1b1..fb6a458 100644
 +//   struct spinlock lock;
 +//   struct proc proc[NPROC];
 +// } ptable;
-+struct ptable_type ptable = {{0}};
++struct process_table ptable = {{0}};
  
  static struct proc *initproc;
  
@@ -295,7 +295,7 @@ index 806b1b1..fb6a458 100644
 +}
 \ No newline at end of file
 diff --git a/proc.h b/proc.h
-index 1647114..e9db121 100644
+index 1647114..6296eea 100644
 --- a/proc.h
 +++ b/proc.h
 @@ -1,3 +1,8 @@
@@ -326,11 +326,11 @@ index 1647114..e9db121 100644
  //   expandable heap
 +
 +
-+struct ptable_type {
++struct process_table {
 +  struct spinlock lock;
 +  struct proc proc[NPROC];
 +};
-+extern struct ptable_type ptable;
++extern struct process_table ptable;
 +
 +#endif // _PROC_H_
 \ No newline at end of file
